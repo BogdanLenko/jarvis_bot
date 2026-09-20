@@ -1,6 +1,6 @@
 import { Bot, Context, InlineKeyboard, type NextFunction } from "grammy";
 import type { State } from "../state/state";
-import { sendMessage } from "./utils/agent/sendMessageToJarvis";
+import { sendMessage } from "./utils/agent/sendMessage";
 import { mediaToBase64 } from "./utils/system/mediaToBase64";
 import { filePart } from "./utils/agent/filePart";
 import { textPart } from "./utils/agent/textPart";
@@ -19,11 +19,14 @@ import {
   createConversation,
 } from "@grammyjs/conversations";
 import { contextKeyboard } from "./utils/telegram/contextKeyboard";
+import { routeMessage } from "./utils/agent/routeMessage";
+import { agentKeyboard } from "./utils/telegram/agentKeyboard";
 
 export const startBot = async (state: State): Promise<void> => {
   const bot = state.getBot();
   const prisma = state.getPrisma()
   const contextMenu = await contextKeyboard(state)
+  const agentMenu = await agentKeyboard(state)
 
   async function saveContext(conversation: Conversation, ctx: Context) {
     await ctx.reply("Enter the name of the context 👉");
@@ -69,6 +72,7 @@ export const startBot = async (state: State): Promise<void> => {
   bot.use(conversations());
   bot.use(createConversation(saveContext))
   bot.use(contextMenu)
+  bot.use(agentMenu)
 
   const opencode = state.getOpencodeClient();
 
@@ -101,9 +105,9 @@ export const startBot = async (state: State): Promise<void> => {
     ctx.reply(String(ctx.from?.id));
   });
   bot.command("agent", async (ctx) => {
-    ctx.reply("Choose agent:", {
-      reply_markup: await genAgentsKeyboard(state),
-    });
+    await ctx.reply("Choose agent:", {
+      reply_markup: agentMenu
+    })
   });
   bot.command("save_context", async (ctx) => {
     await ctx.conversation.enter("saveContext");
@@ -226,13 +230,10 @@ export const startBot = async (state: State): Promise<void> => {
           files.map((file) => saveFile(file.id, file.name, bot)),
         );
 
-        const response = await sendMessage(state, [
+        routeMessage(state, ctx, [
           textPart(userPrompt),
           ...filePaths.map((path) => textPart(`USER SENT A FILE: ${path}`)),
-        ]);
-
-        const text = getText(response);
-        await sendTgMessage(ctx, text);
+        ])
       } catch (error: any) {
         console.error("❌ Album pipeline failed:", error.message);
         await ctx.reply("System: Failed to process the uploaded album.");
@@ -240,64 +241,7 @@ export const startBot = async (state: State): Promise<void> => {
     }, 600);
   });
   bot.on("message:text", async (ctx) => {
-    const response = await sendMessage(state, [textPart(ctx.message.text)]);
-    const text = getText(response);
-    await sendTgMessage(ctx, text);
-  });
-
-  bot.callbackQuery(/^agent_(.+)$/, async (ctx) => {
-    const selectedId = ctx.match[1];
-    if (!selectedId) {
-      await ctx.reply("System: No model is provided");
-      return;
-    }
-
-    await prisma.preferences.update({
-      where: {
-        telegramId: state.getTelegramId()
-      },
-      data: {
-        activeAgent: {
-          connect: {
-            id: selectedId
-          }
-        }
-      }
-    })
-
-    await ctx.answerCallbackQuery({ text: "Done :)" });
-
-    await ctx.deleteMessage();
-  });
-  bot.callbackQuery(/^context_(.+)$/, async (ctx) => {
-    const selectedId = ctx.match[1];
-    if (!selectedId) {
-      await ctx.reply("System: No context is provided");
-      return;
-    }
-
-    if (selectedId !== 'close') {
-      const newContext = await prisma.context.findUnique({
-        where: {
-          id: selectedId
-        }
-      })
-      if (!newContext) {
-        ctx.reply("System: context not found")
-        throw new Error("Context not found")
-      }
-      await prisma.preferences.update({
-        where: {
-          telegramId: state.getTelegramId()
-        },
-        data: {
-          activeOpencodeId: newContext.openCodeId
-        }
-      })
-    }
-
-    await ctx.answerCallbackQuery({ text: "Done :)" });
-    await ctx.deleteMessage();
+    routeMessage(state, ctx, [textPart(ctx.message.text)])
   });
 
   bot.start();

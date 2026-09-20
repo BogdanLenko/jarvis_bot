@@ -3,14 +3,12 @@ import type { State } from "../../../state/state";
 
 export const contextKeyboard = async (state: State) => {
   const prisma = state.getPrisma()
-  const contexts = await prisma.context.findMany()
-  const preferences = await prisma.preferences.findFirst()
 
-  const menu = new Menu("my-menu-identifier").dynamic(async (ctx, range) => {
+  const menu = new Menu("context-menu").dynamic(async (ctx, range) => {
     const contexts = await prisma.context.findMany()
     const preferences = await prisma.preferences.findFirst()
 
-    if (!contexts[0]) {
+    if (!contexts.length) {
       throw new Error("No context found")
     }
 

@@ -1,6 +1,6 @@
 import type { State } from "../../../state/state";
 import { getText } from "../agent/extractTextFromResponse";
-import { sendMessage } from "../agent/sendMessageToJarvis";
+import { sendMessage } from "../agent/sendMessage";
 import { textPart } from "../agent/textPart";
 import { sendTgMessage } from "../telegram/sendTgMessage";
 import { saveFile } from "./saveDocument";

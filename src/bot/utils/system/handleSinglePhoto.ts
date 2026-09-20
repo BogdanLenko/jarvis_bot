@@ -1,7 +1,7 @@
 import type { Context } from "grammy";
 import type { State } from "../../../state/state";
 import { mediaToBase64 } from "./mediaToBase64";
-import { sendMessage } from "../agent/sendMessageToJarvis";
+import { sendMessage } from "../agent/sendMessage";
 import { textPart } from "../agent/textPart";
 import { filePart } from "../agent/filePart";
 import { sendTgMessage } from "../telegram/sendTgMessage";
